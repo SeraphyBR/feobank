@@ -8,4 +8,10 @@
         cargo
         cargo-edit
     ];
+    shellHook = ''
+    if [ ! -e "feobank.db" ]; then
+        sqlx database create
+        sqlx migrate run
+    fi
+    '';
 }
