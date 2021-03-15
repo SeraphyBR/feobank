@@ -1,5 +1,12 @@
 use tokio::net::{TcpListener, TcpStream};
 
+mod account;
+mod session;
+
+use account::Account;
+use session::Session;
+
+
 #[tokio::main]
 async fn main() {
     // Bind the listener to the address
@@ -16,6 +23,13 @@ async fn main() {
     }
 }
 
-async fn handle_connection(socket: TcpStream) {
+async fn handle_connection(stream: TcpStream) {
+    let cpf = String::new();
+    let password = String::new();
+    match Session::login(cpf, password) {
+        Ok(mut session) => session.start(stream),
+        Err(description) => {
 
+        }
+    }
 }
