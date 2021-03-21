@@ -17,3 +17,4 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.2", features = ["fmt"] }
 uuid = { version = "0.8", features = ["serde", "v4"] }
 rust_decimal = "1.10.3"
+cursive = { version = "0.16", features = ["crossterm-backend"]}

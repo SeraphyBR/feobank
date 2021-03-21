@@ -3,7 +3,8 @@ use sqlx::SqlitePool;
 use tokio::net::{TcpListener, TcpStream};
 use dotenv::dotenv;
 
-use feobank::session::Session;
+mod session;
+use session::Session;
 use tracing::{info, warn};
 
 #[tokio::main]

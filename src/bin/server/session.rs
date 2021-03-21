@@ -1,10 +1,10 @@
 use rust_decimal::Decimal;
 use sqlx::SqlitePool;
 use tokio::{io::{AsyncReadExt, AsyncWriteExt, BufWriter}, net::TcpStream};
-use crate::account::{AccountAction, NewAccount};
-use crate::account::AccountAction::*;
+use feobank::account::{AccountAction, NewAccount};
+use feobank::account::AccountAction::*;
 
-use super::account::Account;
+use feobank::account::Account;
 
 pub struct Session {
     account: Option<Account>,
