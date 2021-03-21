@@ -25,6 +25,7 @@ impl Session {
     pub async fn start(&mut self) {
         let mut data = String::new();
         self.conn.read_to_string(&mut data).await.unwrap();
+        println!("Dados recebidos: {}", data);
 
         match serde_json::from_str::<AccountAction>(&data) {
             Ok(action) => self.take_action(action),
