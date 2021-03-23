@@ -22,19 +22,34 @@ impl Session {
         }
     }
 
-    pub async fn start(&mut self) {
-        let mut data = String::new();
-        self.conn.read_to_string(&mut data).await.unwrap();
-        println!("Dados recebidos: {}", data);
+    async fn write_message(&mut self, message: String) {
+        let lenght = message.len();
+        self.conn.write_all(&lenght.to_le_bytes()).await.unwrap();
+        self.conn.write_all(message.as_bytes()).await.unwrap();
+    }
 
-        match serde_json::from_str::<AccountAction>(&data) {
+    async fn read_message(&mut self) -> String {
+        let mut lenght = [0u8; std::mem::size_of::<usize>()];
+        self.conn.read_exact(&mut lenght).await.unwrap();
+        let lenght = usize::from_le_bytes(lenght);
+
+        let mut buf = vec![0u8; lenght];
+        self.conn.read_exact(&mut buf).await.unwrap();
+        String::from_utf8_lossy(&buf).into()
+    }
+
+    pub async fn start(&mut self) {
+        let action = self.read_message().await;
+        println!("Dados recebidos: {}", action);
+
+        match serde_json::from_str::<AccountAction>(&action) {
             Ok(action) => self.take_action(action),
             Err(e) => {}
         };
 
         // Responder ao cliente que a sessão foi iniciada, logado com sucesso
         let data = serde_json::to_string(&self.account).unwrap();
-        self.conn.write_all(data.as_bytes()).await.unwrap();
+        self.write_message(data).await;
 
         // Iniciar o loop de ação principal
         todo!()

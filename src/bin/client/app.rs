@@ -1,8 +1,10 @@
-use cursive::{Cursive, CursiveRunnable, event::{Callback, Key}, menu, traits::*, views::{Dialog, EditView, TextView}};
+use cursive::{Cursive, CursiveRunnable, event::{Callback, Key}, menu, traits::*, views::{Dialog, EditView, LinearLayout, TextView}};
+use feobank::account::AccountAction;
 use crate::session::Session;
-use std::{io::Write, sync::atomic::{AtomicUsize, Ordering}};
+use std::{cell::RefCell, io::Write, sync::atomic::{AtomicUsize, Ordering}};
 use cursive::menu::MenuTree;
 use std::net::TcpStream;
+
 
 pub struct App {
     ui: CursiveRunnable
@@ -30,18 +32,9 @@ impl App {
     fn create_menubar(ui: &mut CursiveRunnable) {
         // The menubar is a list of (label, menu tree) pairs.
         ui.menubar()
-            .add_subtree("File",
-                MenuTree::new()
-                    .leaf("New", move |s| {
-
-                        s.add_layer(Dialog::info("New file!"));
-                    })
-                    .delimiter(),
-            )
             .add_subtree("Help",App::help_menu())
             .add_delimiter()
             .add_leaf("Quit", |s| s.quit());
-
     }
 
     fn help_menu() -> MenuTree {
@@ -113,8 +106,68 @@ impl App {
                         .button("Ok", |s| {s.pop_layer();}),
                 );
 
-                let session = Session::new(s);
+                let session = RefCell::new(Session::new(s));
+                App::login_dialog(ui, session);
             }
         }
+    }
+
+    fn login_dialog(ui: &mut Cursive, s: RefCell<Session>) {
+        ui.add_layer(
+            Dialog::new()
+                .title("Login")
+                // Padding is (left, right, top, bottom)
+                .padding_lrtb(1, 1, 1, 0)
+                .content(
+                    LinearLayout::vertical()
+                        .child(TextView::new("CPF:"))
+                        .child(
+                        EditView::new()
+                            // Give the `EditView` a name so we can refer to it later.
+                            .with_name("login_cpf")
+                            // Wrap this in a `ResizedView` with a fixed width.
+                            // Do this _after_ `with_name` or the name will point to the
+                            // `ResizedView` instead of `EditView`!
+                            .fixed_width(11)
+                        )
+                        .child(TextView::new("Password:"))
+                        .child(
+                        EditView::new()
+                            // Give the `EditView` a name so we can refer to it later.
+                            .with_name("login_password")
+                            // Wrap this in a `ResizedView` with a fixed width.
+                            // Do this _after_ `with_name` or the name will point to the
+                            // `ResizedView` instead of `EditView`!
+                            .fixed_width(16)
+                        )
+                )
+                .button("Create account", |c| {
+
+                })
+                .button("Enter", move |c| {
+                    // This will run the given closure, *ONLY* if a view with the
+                    // correct type and the given name is found.
+                    let cpf = c
+                        .call_on_name("login_cpf", |view: &mut EditView| {
+                            // We can return content from the closure!
+                            view.get_content()
+                        })
+                        .unwrap()
+                        .to_string();
+                    let password = c
+                        .call_on_name("login_password", |view: &mut EditView| {
+                            // We can return content from the closure!
+                            view.get_content()
+                        })
+                        .unwrap()
+                        .to_string();
+
+                    s.borrow_mut().login(cpf, password);
+                }),
+        );
+    }
+
+    fn main_menubar(ui: &mut Cursive, s: Session) {
+
     }
 }
