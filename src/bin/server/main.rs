@@ -1,4 +1,6 @@
 
+use std::io::ErrorKind;
+
 use sqlx::SqlitePool;
 use tokio::net::{TcpListener, TcpStream};
 use dotenv::dotenv;
@@ -7,8 +9,13 @@ mod session;
 use session::Session;
 use tracing::{info, warn};
 
+use tracing_subscriber;
+
 #[tokio::main]
 async fn main() {
+    // Inicialize default log subscriber
+    tracing_subscriber::fmt::init();
+
     // Load .env
     dotenv().ok();
 
@@ -25,9 +32,9 @@ async fn main() {
 
     loop {
         // The second item contains the IP and port of the new connection.
-        let (socket, _addr) = match listener.accept().await {
+        let (socket, addr) = match listener.accept().await {
             Ok(c) => {
-                info!("Connected to ");
+                info!("Connected to {:?}", c.1);
                 c
             },
             Err(e) => {
@@ -40,7 +47,11 @@ async fn main() {
 
         tokio::spawn(async move {
             let mut session = Session::new(socket, db);
-            session.start().await;
+            session.start().await.unwrap_or_else(|e| {
+                if e.kind() == ErrorKind::UnexpectedEof {
+                    info!("The connection to {:?} was terminated unexpectedly", addr)
+                }
+            });
         });
     }
 }

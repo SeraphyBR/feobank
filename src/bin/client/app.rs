@@ -26,15 +26,15 @@ impl App {
         App::create_menubar(&mut self.ui);
         App::connect_to_server_dialog(&mut self.ui);
         self.ui.set_autohide_menu(false);
-        self.ui.add_global_callback(Key::Esc, |s| s.select_menubar());
+        self.ui.add_global_callback(Key::Esc, |ui| ui.select_menubar());
     }
 
-    fn create_menubar(ui: &mut CursiveRunnable) {
+    fn create_menubar(ui: &mut Cursive) {
         // The menubar is a list of (label, menu tree) pairs.
         ui.menubar()
             .add_subtree("Help",App::help_menu())
             .add_delimiter()
-            .add_leaf("Quit", |s| s.quit());
+            .add_leaf("Quit", |ui| ui.quit());
     }
 
     fn help_menu() -> MenuTree {
@@ -45,7 +45,7 @@ impl App {
         })
     }
 
-    fn connect_to_server_dialog(ui: &mut CursiveRunnable) {
+    fn connect_to_server_dialog(ui: &mut Cursive) {
         // Create a dialog with an edit text and a button.
         // The user can either hit the <Ok> button,
         // or press Enter on the edit text.
@@ -65,10 +65,10 @@ impl App {
                         // `ResizedView` instead of `EditView`!
                         .fixed_width(20)
                 )
-                .button("Ok", |s| {
+                .button("Ok", |ui| {
                     // This will run the given closure, *ONLY* if a view with the
                     // correct type and the given name is found.
-                    let addr = s
+                    let addr = ui
                         .call_on_name("connection_dialog", |view: &mut EditView| {
                             // We can return content from the closure!
                             view.get_content()
@@ -76,7 +76,7 @@ impl App {
                         .unwrap();
 
                     // Run the next step
-                    App::try_connect_server(s, &addr);
+                    App::try_connect_server(ui, &addr);
                 }),
         );
     }
@@ -97,7 +97,7 @@ impl App {
                     .button("Ok", |s| {s.pop_layer();}),
             );
 
-            if let Ok(mut s) = TcpStream::connect(addr) {
+            if let Ok(s) = TcpStream::connect(addr) {
                 // Remove the initial popup
                 ui.pop_layer();
                 // And put a new one instead
@@ -112,7 +112,7 @@ impl App {
         }
     }
 
-    fn login_dialog(ui: &mut Cursive, s: RefCell<Session>) {
+    fn login_dialog(ui: &mut Cursive, session: RefCell<Session>) {
         ui.add_layer(
             Dialog::new()
                 .title("Login")
@@ -144,17 +144,17 @@ impl App {
                 .button("Create account", |c| {
 
                 })
-                .button("Enter", move |c| {
+                .button("Enter", move |ui| {
                     // This will run the given closure, *ONLY* if a view with the
                     // correct type and the given name is found.
-                    let cpf = c
+                    let cpf = ui
                         .call_on_name("login_cpf", |view: &mut EditView| {
                             // We can return content from the closure!
                             view.get_content()
                         })
                         .unwrap()
                         .to_string();
-                    let password = c
+                    let password = ui
                         .call_on_name("login_password", |view: &mut EditView| {
                             // We can return content from the closure!
                             view.get_content()
@@ -162,12 +162,29 @@ impl App {
                         .unwrap()
                         .to_string();
 
-                    s.borrow_mut().login(cpf, password);
+                    match session.borrow_mut().login(cpf, password){
+                        Ok(()) => {
+                            // Remove the initial popup
+                            ui.pop_layer();
+                            // And put a new one instead
+                            ui.add_layer(
+                                Dialog::around(TextView::new("successfully logged in!"))
+                                    .button("Ok", |ui| {ui.pop_layer();}),
+                            );
+                        }
+                        Err(msg) => {
+                            let content = format!("Error: {}", msg);
+                            ui.add_layer(
+                                Dialog::around(TextView::new(content))
+                                    .button("Ok", |ui| {ui.pop_layer();}),
+                            );
+                        }
+                    };
                 }),
         );
     }
 
     fn main_menubar(ui: &mut Cursive, s: Session) {
-
+        todo!()
     }
 }
