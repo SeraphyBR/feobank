@@ -20,7 +20,7 @@ async fn main() {
     dotenv().ok();
 
     let addr = std::env::var("SERVER_ADDR").expect("SERVER_ADDR must be set!");
-    let database_uri = std::env::var("DATABASE_URI").expect("DATABASE_URI must be set!");
+    let database_uri = std::env::var("DATABASE_URL").expect("DATABASE_URI must be set!");
 
     // Bind the listener to the address
     let listener = TcpListener::bind(&addr).await.unwrap();
