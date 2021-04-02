@@ -1,13 +1,11 @@
 use rust_decimal::Decimal;
 use sqlx::SqlitePool;
 use tokio::{io::{self, AsyncReadExt, AsyncWriteExt}, net::TcpStream};
-use feobank::account::{AccountAction, NewAccount};
-use feobank::account::AccountAction::*;
-
-use feobank::account::Account;
+use feobank::user::*;
+use feobank::user::UserAction::*;
 
 pub struct Session {
-    account: Option<Account>,
+    user: Option<User>,
     conn: TcpStream,
     db: SqlitePool
 }
@@ -16,7 +14,7 @@ impl Session {
 
     pub fn new(conn: TcpStream, db: SqlitePool) -> Session {
         Session {
-            account: None,
+            user: None,
             conn,
             db
         }
@@ -43,18 +41,18 @@ impl Session {
     pub async fn start(&mut self) -> io::Result<()>{
         loop {
             let action = self.read_message().await?;
-            match serde_json::from_str::<AccountAction>(&action) {
+            match serde_json::from_str::<UserAction>(&action) {
                 Ok(action) => self.take_action(action).await?,
                 Err(e) => {}
             };
         }
     }
 
-    async fn take_action(&mut self, action: AccountAction) -> io::Result<()> {
+    async fn take_action(&mut self, action: UserAction) -> io::Result<()> {
         match action {
             Login { cpf, password } => self.login(cpf, password).await?,
-            CreateAccount(data) => self.create_account(data).await,
-            DeleteAccount => self.delete_account().await,
+            CreateUser(data) => self.create_user(data).await,
+            DeleteAccount => self.delete_user().await,
             TransferMoney { dest_cpf, value } => self.transfer_money(dest_cpf, value).await,
             PayBill(_) => {}
             CreateBill {  } => {}
@@ -65,17 +63,37 @@ impl Session {
 
     async fn login(&mut self, cpf: String, password: String) -> io::Result<()> {
         // Responder ao cliente que a sessão foi iniciada, logado com sucesso
-        let data = serde_json::to_string(&self.account).unwrap();
+        let data = serde_json::to_string(&self.user).unwrap();
         self.write_message(data).await?;
         self.write_message("Senha incorreta".to_string()).await?;
         Ok(())
     }
 
-    async fn create_account(&mut self, data: NewAccount) {
-
+    async fn create_user(&mut self, u: NewUser) {
+        let _result = sqlx::query!(
+            "INSERT INTO user (
+                id,
+                account_id,
+                cpf,
+                password,
+                name,
+                address,
+                phone,
+                birthdate
+            ) VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
+            "id teste",
+            "id conta",
+            u.cpf,
+            u.password,
+            u.name,
+            u.address,
+            u.phone,
+            u.birthdate
+        )
+        .execute(&self.db).await.unwrap();
     }
 
-    async fn delete_account(&mut self) {
+    async fn delete_user(&mut self) {
 
     }
 

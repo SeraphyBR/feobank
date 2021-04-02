@@ -1,20 +1,19 @@
 use rust_decimal::Decimal;
-use feobank::account::{self, AccountAction, NewAccount};
-use feobank::account::AccountAction::*;
+use bcrypt::{DEFAULT_COST, hash, verify};
 use std::{error::Error, io::{Read, Write}, net::{SocketAddr, TcpStream, Ipv4Addr}};
 
-use feobank::account::Account;
-use bcrypt::{DEFAULT_COST, hash, verify};
+use feobank::user::*;
+use feobank::user::UserAction::*;
 
 pub struct Session {
-    account: Option<Account>,
+    user: Option<User>,
     conn: TcpStream,
 }
 
 impl Session {
     pub fn new(conn: TcpStream) -> Session {
         Session {
-            account: None,
+            user: None,
             conn
         }
     }
@@ -39,18 +38,26 @@ impl Session {
         // Hash password with bcrypt
         let password = hash(password.as_str(), DEFAULT_COST).unwrap();
 
-        let action = AccountAction::Login {cpf, password};
+        let action = UserAction::Login {cpf, password};
         let data = serde_json::to_string(&action).unwrap();
 
         self.write_message(data);
         let response = self.read_message();
-        self.account = serde_json::from_str(&response).unwrap();
+        self.user = serde_json::from_str(&response).unwrap();
 
-        if self.account.is_none() {
+        if self.user.is_none() {
             Err(self.read_message())
         }
         else {
             Ok(())
         }
+    }
+
+    pub fn create_user(&mut self, user: NewUser) -> Result<(), String> {
+        let action = UserAction::CreateUser(user);
+        let data = serde_json::to_string(&action).unwrap();
+        self.write_message(data);
+        let response = self.read_message();
+        serde_json::from_str(&response).unwrap()
     }
 }

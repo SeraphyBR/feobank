@@ -1,5 +1,5 @@
 use cursive::{Cursive, CursiveRunnable, event::{Callback, Key}, menu, traits::*, views::{Dialog, EditView, LinearLayout, TextView}};
-use feobank::account::AccountAction;
+use feobank::user::UserAction;
 use crate::session::Session;
 use std::{cell::RefCell, io::Write, sync::atomic::{AtomicUsize, Ordering}};
 use cursive::menu::MenuTree;
@@ -56,14 +56,12 @@ impl App {
                 .padding_lrtb(1, 1, 1, 0)
                 .content(
                     EditView::new()
+                        .max_content_width(24)
                         // Call `show_popup` when the user presses `Enter`
                         .on_submit(App::try_connect_server)
                         // Give the `EditView` a name so we can refer to it later.
                         .with_name("connection_dialog")
-                        // Wrap this in a `ResizedView` with a fixed width.
-                        // Do this _after_ `with_name` or the name will point to the
-                        // `ResizedView` instead of `EditView`!
-                        .fixed_width(20)
+                        .fixed_width(25)
                 )
                 .button("Ok", |ui| {
                     // This will run the given closure, *ONLY* if a view with the
@@ -123,22 +121,17 @@ impl App {
                         .child(TextView::new("CPF:"))
                         .child(
                         EditView::new()
+                            .max_content_width(11)
                             // Give the `EditView` a name so we can refer to it later.
                             .with_name("login_cpf")
-                            // Wrap this in a `ResizedView` with a fixed width.
-                            // Do this _after_ `with_name` or the name will point to the
-                            // `ResizedView` instead of `EditView`!
-                            .fixed_width(11)
                         )
                         .child(TextView::new("Password:"))
                         .child(
                         EditView::new()
+                            .max_content_width(16)
+                            .secret()
                             // Give the `EditView` a name so we can refer to it later.
                             .with_name("login_password")
-                            // Wrap this in a `ResizedView` with a fixed width.
-                            // Do this _after_ `with_name` or the name will point to the
-                            // `ResizedView` instead of `EditView`!
-                            .fixed_width(16)
                         )
                 )
                 .button("Create account", |c| {
