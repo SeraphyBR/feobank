@@ -1,19 +1,16 @@
 use rust_decimal::Decimal;
-use bcrypt::{DEFAULT_COST, hash, verify};
 use std::{error::Error, io::{Read, Write}, net::{SocketAddr, TcpStream, Ipv4Addr}};
 
 use feobank::user::*;
 use feobank::user::UserAction::*;
 
 pub struct Session {
-    user: Option<User>,
-    conn: TcpStream,
+    conn: TcpStream
 }
 
 impl Session {
     pub fn new(conn: TcpStream) -> Session {
         Session {
-            user: None,
             conn
         }
     }
@@ -35,22 +32,12 @@ impl Session {
     }
 
     pub fn login(&mut self, cpf: String, password: String) -> Result<(), String> {
-        // Hash password with bcrypt
-        let password = hash(password.as_str(), DEFAULT_COST).unwrap();
-
         let action = UserAction::Login {cpf, password};
         let data = serde_json::to_string(&action).unwrap();
-
         self.write_message(data);
-        let response = self.read_message();
-        self.user = serde_json::from_str(&response).unwrap();
 
-        if self.user.is_none() {
-            Err(self.read_message())
-        }
-        else {
-            Ok(())
-        }
+        let response = self.read_message();
+        serde_json::from_str(&response).unwrap()
     }
 
     pub fn create_user(&mut self, user: NewUser) -> Result<(), String> {

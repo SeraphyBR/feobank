@@ -1,9 +1,12 @@
+use chrono::NaiveDate;
 use rust_decimal::Decimal;
 use sqlx::SqlitePool;
 use tokio::{io::{self, AsyncReadExt, AsyncWriteExt}, net::TcpStream};
 use feobank::user::*;
 use feobank::user::UserAction::*;
 use uuid::Uuid;
+
+use bcrypt::{DEFAULT_COST, hash, verify};
 
 pub struct Session {
     user: Option<User>,
@@ -52,7 +55,7 @@ impl Session {
     async fn take_action(&mut self, action: UserAction) -> io::Result<()> {
         match action {
             Login { cpf, password } => self.login(cpf, password).await?,
-            CreateUser(data) => self.create_user(data).await,
+            CreateUser(data) => self.create_user(data).await?,
             DeleteAccount => self.delete_user().await,
             TransferMoney { dest_cpf, value } => self.transfer_money(dest_cpf, value).await,
             PayBill(_) => {}
@@ -63,16 +66,47 @@ impl Session {
     }
 
     async fn login(&mut self, cpf: String, password: String) -> io::Result<()> {
+        let record = sqlx::query!("SELECT password FROM user WHERE cpf = ?", cpf)
+            .fetch_one(&self.db).await.unwrap();
+
+        let valid = verify(password, &record.password).unwrap();
+
+        let response: Result<(), &str>;
+        if valid {
+            response = Ok(());
+            let record = sqlx::query!("SELECT * FROM user WHERE cpf = ?", cpf)
+                .fetch_one(&self.db).await.unwrap();
+
+            self.user = Some(
+                User {
+                    id: Uuid::parse_str(&record.id).unwrap(),
+                    account_id: Uuid::parse_str(&record.account_id).unwrap(),
+                    cpf: record.cpf,
+                    password: record.password,
+                    email: record.email,
+                    name: record.name,
+                    address: record.address,
+                    phone: record.phone,
+                    birthdate: record.birthdate.date(),
+                    last_login: record.last_login
+                }
+            );
+        }
+        else {
+            response = Err("CPF/Password is not valid");
+            self.user = None;
+        }
+
         // Responder ao cliente que a sessão foi iniciada, logado com sucesso
-        let data = serde_json::to_string(&self.user).unwrap();
+        let data = serde_json::to_string(&response).unwrap();
         self.write_message(data).await?;
-        self.write_message("Senha incorreta".to_string()).await?;
         Ok(())
     }
 
-    async fn create_user(&mut self, u: NewUser) {
+    async fn create_user(&mut self, u: NewUser) -> io::Result<()> {
         let id_account = Uuid::new_v4().to_string();
         let id_user = Uuid::new_v4().to_string();
+        let password = hash(u.password, DEFAULT_COST).unwrap();
         let _result = sqlx::query!(
             "INSERT INTO account (
                 id,
@@ -81,6 +115,8 @@ impl Session {
             id_account,
             1
         ).execute(&self.db).await.unwrap();
+
+        let birthdate = u.birthdate.and_hms(1, 0, 0);
 
         let _result = sqlx::query!(
             "INSERT INTO user (
@@ -97,14 +133,19 @@ impl Session {
             id_user,
             id_account,
             u.cpf,
-            u.password,
+            password,
             u.email,
             u.name,
             u.address,
             u.phone,
-            u.birthdate
+            birthdate
         )
         .execute(&self.db).await.unwrap();
+
+        let response: Result<(), String> = Ok(());
+        let message = serde_json::to_string(&response).unwrap();
+        self.write_message(message).await?;
+        Ok(())
     }
 
     async fn delete_user(&mut self) {

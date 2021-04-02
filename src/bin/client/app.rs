@@ -1,9 +1,10 @@
-use cursive::{Cursive, CursiveRunnable, event::{Callback, Key}, menu, traits::*, views::{Dialog, EditView, LinearLayout, TextView}};
-use feobank::user::UserAction;
+use chrono::{NaiveDate, Utc};
+use cursive::{Cursive, CursiveRunnable, event::{Callback, Key}, menu, traits::*, views::{Button, Dialog, EditView, LinearLayout, TextView}};
+use cursive_calendar_view::{CalendarView, EnglishLocale};
+use feobank::user::{NewUser, UserAction};
 use crate::session::Session;
-use std::{cell::{RefCell, RefMut}, io::Write, rc::Rc, sync::atomic::{AtomicUsize, Ordering}};
 use cursive::menu::MenuTree;
-use std::net::TcpStream;
+use std::{collections::HashMap, net::TcpStream, str::FromStr};
 
 
 pub struct App {
@@ -23,15 +24,15 @@ impl App {
     }
 
     fn create_ui(&mut self) {
-        App::create_menubar(&mut self.ui);
-        App::connect_to_server_dialog(&mut self.ui);
+        self.create_menubar();
+        self.connect_to_server_dialog();
         self.ui.set_autohide_menu(false);
         self.ui.add_global_callback(Key::Esc, |ui| ui.select_menubar());
     }
 
-    fn create_menubar(ui: &mut Cursive) {
+    fn create_menubar(&mut self) {
         // The menubar is a list of (label, menu tree) pairs.
-        ui.menubar()
+        self.ui.menubar()
             .add_subtree("Help",App::help_menu())
             .add_delimiter()
             .add_leaf("Quit", |ui| ui.quit());
@@ -45,11 +46,8 @@ impl App {
         })
     }
 
-    fn connect_to_server_dialog(ui: &mut Cursive) {
-        // Create a dialog with an edit text and a button.
-        // The user can either hit the <Ok> button,
-        // or press Enter on the edit text.
-        ui.add_layer(
+    fn connect_to_server_dialog(&mut self) {
+        self.ui.add_layer(
             Dialog::new()
                 .title("Enter server ip address and port:")
                 // Padding is (left, right, top, bottom)
@@ -106,14 +104,12 @@ impl App {
 
                 //let session = Rc::new(RefCell::new(Session::new(s)));
                 ui.set_user_data(Session::new(s));
-                App::login_dialog(ui, session);
+                App::login_dialog(ui);
             }
         }
     }
 
-    fn login_dialog(ui: &mut Cursive, session: Rc<RefCell<Session>>) {
-        let session1 = session.clone();
-        let session2 = session.clone();
+    fn login_dialog(ui: &mut Cursive) {
         ui.add_layer(
             Dialog::new()
                 .title("Login")
@@ -137,8 +133,8 @@ impl App {
                             .with_name("login_password")
                         )
                 )
-                .button("Create account", move |ui| {
-                    App::create_account_dialog(ui, session1.clone());
+                .button("Create account", |ui| {
+                    App::create_account_dialog(ui);
                 })
                 .button("Enter", move |ui| {
                     // This will run the given closure, *ONLY* if a view with the
@@ -158,7 +154,8 @@ impl App {
                         .unwrap()
                         .to_string();
 
-                    match session2.borrow_mut().login(cpf, password){
+                    let session = ui.user_data::<Session>().unwrap();
+                    match session.login(cpf, password) {
                         Ok(()) => {
                             // Remove the initial popup
                             ui.pop_layer();
@@ -180,7 +177,7 @@ impl App {
         );
     }
 
-    fn create_account_dialog(ui: &mut Cursive, session: Rc<RefCell<Session>>) {
+    fn create_account_dialog(ui: &mut Cursive) {
         ui.add_layer(
             Dialog::new()
                 .title("Create Account")
@@ -191,53 +188,119 @@ impl App {
                         .child(TextView::new("Full Name:"))
                         .child(
                         EditView::new()
-                            .max_content_width(20)
+                            .max_content_width(120)
                             // Give the `EditView` a name so we can refer to it later.
                             .with_name("name")
                         )
-                        .child(TextView::new("email:"))
+                        .child(TextView::new("Email:"))
                         .child(
                         EditView::new()
-                            .max_content_width(16)
-                            .secret()
+                            .max_content_width(40)
                             // Give the `EditView` a name so we can refer to it later.
                             .with_name("email")
                         )
-                        .child(TextView::new("phone number:"))
+                        .child(TextView::new("Birthdate: "))
+                        .child(
+                            LinearLayout::horizontal()
+                            .child(
+                                EditView::new()
+                                .max_content_width(10)
+                                .with_name("birthdate")
+                                .fixed_width(11)
+                            )
+                            .child(
+                                Button::new("Select", |ui| {
+                                    let calendar = CalendarView::<Utc, EnglishLocale>::new(Utc::today())
+                                        .on_submit(|ui, date| {
+                                            ui.call_on_name("birthdate", |v: &mut EditView| {
+                                                v.set_content(date.format("%Y-%m-%d").to_string());
+                                            });
+                                            ui.pop_layer();
+                                        });
+                                    ui.add_layer(
+                                        Dialog::new()
+                                            .title("Calendar")
+                                            .padding_lrtb(1, 1, 1, 0)
+                                            .content(calendar)
+                                    );
+                                })
+                            )
+                        )
+                        .child(TextView::new("Phone number:"))
                         .child(
                         EditView::new()
                             .max_content_width(16)
-                            .secret()
                             // Give the `EditView` a name so we can refer to it later.
                             .with_name("phone")
                         )
-                        .child(TextView::new("address:"))
+                        .child(TextView::new("Address:"))
                         .child(
                         EditView::new()
                             .max_content_width(16)
-                            .secret()
                             // Give the `EditView` a name so we can refer to it later.
                             .with_name("address")
                         )
-                        .child(TextView::new("cpf:"))
+                        .child(TextView::new("CPF:"))
                         .child(
                         EditView::new()
                             .max_content_width(16)
-                            .secret()
                             // Give the `EditView` a name so we can refer to it later.
                             .with_name("cpf")
                         )
+                        .child(TextView::new("Password:"))
+                        .child(
+                        EditView::new()
+                            .max_content_width(16)
+                            // Give the `EditView` a name so we can refer to it later.
+                            .with_name("password")
+                        )
                 )
-                .button("Cancel", |c| {
-
+                .button("Cancel", |ui| {
+                    ui.pop_layer();
                 })
                 .button("Create", |ui| {
+                    let callbacks = ["name", "email", "birthdate", "phone", "address", "cpf", "password"];
+                    let mut values = HashMap::new();
+                    for name in callbacks.iter() {
+                        let value = ui.call_on_name(name, |v: &mut EditView| v.get_content())
+                            .unwrap();
+                        values.insert(*name, value);
+                    }
 
+                    let birthdate = NaiveDate::from_str(&values["birthdate"]).unwrap();
+                    let user = NewUser {
+                        name: values["name"].to_string(),
+                        email: values["email"].to_string(),
+                        cpf: values["cpf"].to_string(),
+                        password: values["password"].to_string(),
+                        address: values["address"].to_string(),
+                        phone: values["phone"].to_string(),
+                        birthdate
+                    };
+                    let session = ui.user_data::<Session>().unwrap();
+                    match session.create_user(user) {
+                        Ok(()) => {
+                            // Remove the initial popup
+                            ui.pop_layer();
+                            // And put a new one instead
+                            ui.add_layer(
+                                Dialog::around(TextView::new("User created!"))
+                                    .button("Ok", |ui| {ui.pop_layer();}),
+                            );
+                        }
+                        Err(msg) => {
+                            let content = format!("Error: {}", msg);
+                            ui.add_layer(
+                                Dialog::around(TextView::new(content))
+                                    .button("Ok", |ui| {ui.pop_layer();}),
+                            );
+                        }
+                    }
                 }),
         );
     }
 
-    fn main_menubar(ui: &mut Cursive, s: Session) {
+    fn main_menubar(ui: &mut Cursive) {
         todo!()
     }
 }

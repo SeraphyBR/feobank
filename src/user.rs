@@ -1,20 +1,20 @@
-use chrono::NaiveDate;
+use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
 #[derive(Serialize, Deserialize)]
 pub struct User {
-    id: Uuid,
-    account_id: Uuid,
-    cpf: String,
-    password: String,
-    email: String,
-    name: String,
-    address: String,
-    phone: String,
-    birthdate: NaiveDate,
-    last_login: NaiveDate,
+    pub id: Uuid,
+    pub account_id: Uuid,
+    pub cpf: String,
+    pub password: String,
+    pub email: String,
+    pub name: String,
+    pub address: String,
+    pub phone: String,
+    pub birthdate: NaiveDate,
+    pub last_login: Option<NaiveDateTime>,
 }
 
 #[derive(Serialize, Deserialize)]
