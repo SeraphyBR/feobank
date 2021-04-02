@@ -1,5 +1,5 @@
 use rust_decimal::Decimal;
-use std::{error::Error, io::{Read, Write}, net::{SocketAddr, TcpStream, Ipv4Addr}};
+use std::{error::Error, io::{Read, Write}, net::{Ipv4Addr, Shutdown, SocketAddr, TcpStream}};
 
 use feobank::user::*;
 use feobank::user::UserAction::*;
@@ -13,6 +13,10 @@ impl Session {
         Session {
             conn
         }
+    }
+
+    pub fn close(&self) {
+        self.conn.shutdown(Shutdown::Both).unwrap();
     }
 
     fn read_message(&mut self) -> String {

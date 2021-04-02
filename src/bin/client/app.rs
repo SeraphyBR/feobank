@@ -1,7 +1,7 @@
 use chrono::{NaiveDate, Utc};
-use cursive::{Cursive, CursiveRunnable, event::{Callback, Key}, menu, traits::*, views::{Button, Dialog, EditView, LinearLayout, TextView}};
+use cursive::{Cursive, CursiveRunnable, event::{Callback, Key}, menu, traits::*, views::{Button, Dialog, EditView, LinearLayout, SelectView, TextView}};
 use cursive_calendar_view::{CalendarView, EnglishLocale};
-use feobank::user::{NewUser, UserAction};
+use feobank::user::{NewUser, User, UserAction};
 use crate::session::Session;
 use cursive::menu::MenuTree;
 use std::{collections::HashMap, net::TcpStream, str::FromStr};
@@ -35,7 +35,16 @@ impl App {
         self.ui.menubar()
             .add_subtree("Help",App::help_menu())
             .add_delimiter()
-            .add_leaf("Quit", |ui| ui.quit());
+            .add_leaf("Quit", |ui| {
+                    match ui.take_user_data::<Session>() {
+                        Some(s) => {
+                           s.close();
+                        },
+                        None => {}
+                    };
+                    ui.quit()
+                }
+            );
     }
 
     fn help_menu() -> MenuTree {
@@ -55,6 +64,7 @@ impl App {
                 .content(
                     EditView::new()
                         .max_content_width(24)
+                        .content("127.0.0.1:7364")
                         // Call `show_popup` when the user presses `Enter`
                         .on_submit(App::try_connect_server)
                         // Give the `EditView` a name so we can refer to it later.
@@ -96,11 +106,6 @@ impl App {
             if let Ok(s) = TcpStream::connect(addr) {
                 // Remove the initial popup
                 ui.pop_layer();
-                // And put a new one instead
-                ui.add_layer(
-                    Dialog::around(TextView::new("Connected!"))
-                        .button("Ok", |ui| {ui.pop_layer();}),
-                );
 
                 //let session = Rc::new(RefCell::new(Session::new(s)));
                 ui.set_user_data(Session::new(s));
@@ -121,6 +126,7 @@ impl App {
                         .child(
                         EditView::new()
                             .max_content_width(11)
+                            .content("02352154650")
                             // Give the `EditView` a name so we can refer to it later.
                             .with_name("login_cpf")
                         )
@@ -128,6 +134,7 @@ impl App {
                         .child(
                         EditView::new()
                             .max_content_width(16)
+                            .content("Senha")
                             .secret()
                             // Give the `EditView` a name so we can refer to it later.
                             .with_name("login_password")
@@ -160,10 +167,7 @@ impl App {
                             // Remove the initial popup
                             ui.pop_layer();
                             // And put a new one instead
-                            ui.add_layer(
-                                Dialog::around(TextView::new("successfully logged in!"))
-                                    .button("Ok", |ui| {ui.pop_layer();}),
-                            );
+                            App::action_menu_dialog(ui);
                         }
                         Err(msg) => {
                             let content = format!("Error: {}", msg);
@@ -298,6 +302,61 @@ impl App {
                     }
                 }),
         );
+    }
+
+    fn action_menu_dialog(ui: &mut Cursive) {
+        ui.add_layer(
+        Dialog::new()
+            .title("Main Menu")
+            // Padding is (left, right, top, bottom)
+            .padding_lrtb(1, 1, 1, 0)
+            .content(
+                SelectView::new()
+                .item("Pay Bill", 1)
+                .item("Transfer Money", 2)
+                .item("Get Statment", 3)
+                .item("Create Bill", 4)
+                .on_submit(|ui, item| {
+                    match item {
+                        1 => App::action_pay_bill_dialog(ui),
+                        2 => App::action_transfer_money_dialog(ui),
+                        3 => App::action_get_statment_dialog(ui),
+                        4 => App::action_create_bill_dialog(ui),
+                        _ => unreachable!("no such item"),
+                    };
+                })
+            )
+        )
+    }
+
+    fn action_pay_bill_dialog(ui: &mut Cursive) {
+        ui.add_layer(
+            Dialog::new()
+            .title("Pay Bill")
+            .padding_lrtb(1, 1, 1, 0)
+            .content(
+                LinearLayout::vertical()
+                .child(TextView::new("Id:"))
+                .child(
+                EditView::new()
+                    .max_content_width(16)
+                    // Give the `EditView` a name so we can refer to it later.
+                    .with_name("bill_id")
+                )
+            )
+        )
+    }
+
+    fn action_transfer_money_dialog(ui: &mut Cursive) {
+
+    }
+
+    fn action_get_statment_dialog(ui: &mut Cursive) {
+
+    }
+
+    fn action_create_bill_dialog(ui: &mut Cursive) {
+
     }
 
     fn main_menubar(ui: &mut Cursive) {
