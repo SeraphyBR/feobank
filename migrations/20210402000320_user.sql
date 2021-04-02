@@ -4,6 +4,7 @@ CREATE TABLE user (
   account_id TEXT NOT NULL,
   cpf TEXT NOT NULL,
   password TEXT NOT NULL,
+  email TEXT NOT NULL,
   name TEXT NOT NULL,
   address TEXT NOT NULL,
   phone TEXT NOT NULL,

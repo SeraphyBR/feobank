@@ -1,7 +1,7 @@
 use cursive::{Cursive, CursiveRunnable, event::{Callback, Key}, menu, traits::*, views::{Dialog, EditView, LinearLayout, TextView}};
 use feobank::user::UserAction;
 use crate::session::Session;
-use std::{cell::RefCell, io::Write, sync::atomic::{AtomicUsize, Ordering}};
+use std::{cell::{RefCell, RefMut}, io::Write, rc::Rc, sync::atomic::{AtomicUsize, Ordering}};
 use cursive::menu::MenuTree;
 use std::net::TcpStream;
 
@@ -92,7 +92,7 @@ impl App {
             // And put a new one instead
             ui.add_layer(
                 Dialog::around(TextView::new(content))
-                    .button("Ok", |s| {s.pop_layer();}),
+                    .button("Ok", |ui| {ui.pop_layer();}),
             );
 
             if let Ok(s) = TcpStream::connect(addr) {
@@ -101,16 +101,19 @@ impl App {
                 // And put a new one instead
                 ui.add_layer(
                     Dialog::around(TextView::new("Connected!"))
-                        .button("Ok", |s| {s.pop_layer();}),
+                        .button("Ok", |ui| {ui.pop_layer();}),
                 );
 
-                let session = RefCell::new(Session::new(s));
+                //let session = Rc::new(RefCell::new(Session::new(s)));
+                ui.set_user_data(Session::new(s));
                 App::login_dialog(ui, session);
             }
         }
     }
 
-    fn login_dialog(ui: &mut Cursive, session: RefCell<Session>) {
+    fn login_dialog(ui: &mut Cursive, session: Rc<RefCell<Session>>) {
+        let session1 = session.clone();
+        let session2 = session.clone();
         ui.add_layer(
             Dialog::new()
                 .title("Login")
@@ -134,8 +137,8 @@ impl App {
                             .with_name("login_password")
                         )
                 )
-                .button("Create account", |c| {
-
+                .button("Create account", move |ui| {
+                    App::create_account_dialog(ui, session1.clone());
                 })
                 .button("Enter", move |ui| {
                     // This will run the given closure, *ONLY* if a view with the
@@ -155,7 +158,7 @@ impl App {
                         .unwrap()
                         .to_string();
 
-                    match session.borrow_mut().login(cpf, password){
+                    match session2.borrow_mut().login(cpf, password){
                         Ok(()) => {
                             // Remove the initial popup
                             ui.pop_layer();
@@ -173,6 +176,63 @@ impl App {
                             );
                         }
                     };
+                }),
+        );
+    }
+
+    fn create_account_dialog(ui: &mut Cursive, session: Rc<RefCell<Session>>) {
+        ui.add_layer(
+            Dialog::new()
+                .title("Create Account")
+                // Padding is (left, right, top, bottom)
+                .padding_lrtb(1, 1, 1, 0)
+                .content(
+                    LinearLayout::vertical()
+                        .child(TextView::new("Full Name:"))
+                        .child(
+                        EditView::new()
+                            .max_content_width(20)
+                            // Give the `EditView` a name so we can refer to it later.
+                            .with_name("name")
+                        )
+                        .child(TextView::new("email:"))
+                        .child(
+                        EditView::new()
+                            .max_content_width(16)
+                            .secret()
+                            // Give the `EditView` a name so we can refer to it later.
+                            .with_name("email")
+                        )
+                        .child(TextView::new("phone number:"))
+                        .child(
+                        EditView::new()
+                            .max_content_width(16)
+                            .secret()
+                            // Give the `EditView` a name so we can refer to it later.
+                            .with_name("phone")
+                        )
+                        .child(TextView::new("address:"))
+                        .child(
+                        EditView::new()
+                            .max_content_width(16)
+                            .secret()
+                            // Give the `EditView` a name so we can refer to it later.
+                            .with_name("address")
+                        )
+                        .child(TextView::new("cpf:"))
+                        .child(
+                        EditView::new()
+                            .max_content_width(16)
+                            .secret()
+                            // Give the `EditView` a name so we can refer to it later.
+                            .with_name("cpf")
+                        )
+                )
+                .button("Cancel", |c| {
+
+                })
+                .button("Create", |ui| {
+
                 }),
         );
     }

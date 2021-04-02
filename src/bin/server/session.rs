@@ -3,6 +3,7 @@ use sqlx::SqlitePool;
 use tokio::{io::{self, AsyncReadExt, AsyncWriteExt}, net::TcpStream};
 use feobank::user::*;
 use feobank::user::UserAction::*;
+use uuid::Uuid;
 
 pub struct Session {
     user: Option<User>,
@@ -70,21 +71,34 @@ impl Session {
     }
 
     async fn create_user(&mut self, u: NewUser) {
+        let id_account = Uuid::new_v4().to_string();
+        let id_user = Uuid::new_v4().to_string();
+        let _result = sqlx::query!(
+            "INSERT INTO account (
+                id,
+                agency
+            ) VALUES (?, ?)",
+            id_account,
+            1
+        ).execute(&self.db).await.unwrap();
+
         let _result = sqlx::query!(
             "INSERT INTO user (
                 id,
                 account_id,
                 cpf,
                 password,
+                email,
                 name,
                 address,
                 phone,
                 birthdate
-            ) VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
-            "id teste",
-            "id conta",
+            ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            id_user,
+            id_account,
             u.cpf,
             u.password,
+            u.email,
             u.name,
             u.address,
             u.phone,

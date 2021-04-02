@@ -9,6 +9,7 @@ pub struct User {
     account_id: Uuid,
     cpf: String,
     password: String,
+    email: String,
     name: String,
     address: String,
     phone: String,
@@ -19,6 +20,7 @@ pub struct User {
 #[derive(Serialize, Deserialize)]
 pub struct NewUser {
     pub name: String,
+    pub email: String,
     pub cpf: String,
     pub password: String,
     pub address: String,
