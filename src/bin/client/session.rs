@@ -1,5 +1,5 @@
 use uuid::Uuid;
-use std::{error::Error, io::{Read, Write}, net::{Ipv4Addr, Shutdown, SocketAddr, TcpStream}};
+use std::{io::{Read, Write}, net::{Shutdown, TcpStream}};
 
 use feobank::{bill::Bill, user::*};
 

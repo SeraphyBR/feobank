@@ -1,10 +1,8 @@
-use std::os::linux::raw::stat;
-
-use chrono::NaiveDate;
 use sqlx::SqlitePool;
 use tokio::{io::{self, AsyncReadExt, AsyncWriteExt}, net::TcpStream};
 use feobank::{account::Account, bill::Bill, user::*};
 use feobank::user::UserAction::*;
+use tracing::warn;
 use uuid::Uuid;
 
 use bcrypt::{DEFAULT_COST, hash, verify};
@@ -53,7 +51,9 @@ impl Session {
                         _ => self.take_action(action).await?
                     }
                 },
-                Err(e) => {}
+                Err(e) => {
+                    warn!("{}", e);
+                }
             };
         }
     }
@@ -341,7 +341,7 @@ impl Session {
 
     async fn gen_statment(&mut self) -> io::Result<()> {
         let response: Result<String, &str>;
-        if let Some((u, a)) = &self.user {
+        if let Some((_u, a)) = &self.user {
             let account_id = a.id.to_hyphenated();
             let mut statment = String::new();
             let records = sqlx::query!(
@@ -383,9 +383,5 @@ impl Session {
         if self.user.is_some() {
             self.user = None;
         }
-    }
-
-    async fn close_connection(&mut self) {
-
     }
 }

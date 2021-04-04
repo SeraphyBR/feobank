@@ -2,7 +2,7 @@
 use std::io::ErrorKind;
 
 use sqlx::SqlitePool;
-use tokio::net::{TcpListener, TcpStream};
+use tokio::net::TcpListener;
 use dotenv::dotenv;
 
 mod session;
@@ -38,7 +38,7 @@ async fn main() {
                 c
             },
             Err(e) => {
-                warn!("");
+                warn!("{}", e);
                 continue;
             }
         };

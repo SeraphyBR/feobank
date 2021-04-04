@@ -1,11 +1,11 @@
-use chrono::{NaiveDate, NaiveDateTime, Utc};
-use cursive::{Cursive, CursiveRunnable, event::{Callback, Key}, menu, traits::*, views::{Button, Dialog, EditView, LinearLayout, SelectView, TextView}};
-use cursive_calendar_view::{CalendarView, EnglishLocale};
-use feobank::{bill::Bill, user::{NewUser, User, UserAction}};
-use uuid::Uuid;
+use chrono::{NaiveDate, Utc};
 use crate::session::Session;
 use cursive::menu::MenuTree;
+use cursive::{Cursive, CursiveRunnable, event::Key, traits::*, views::{Button, Dialog, EditView, LinearLayout, SelectView, TextView}};
+use cursive_calendar_view::{CalendarView, EnglishLocale};
+use feobank::{bill::Bill, user::NewUser};
 use std::{collections::HashMap, net::TcpStream, str::FromStr};
+use uuid::Uuid;
 
 pub struct App {
     ui: CursiveRunnable
