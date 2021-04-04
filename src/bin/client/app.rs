@@ -49,7 +49,7 @@ impl App {
     fn help_menu() -> MenuTree {
         MenuTree::new()
         .leaf("About", |ui|{
-            let message = "Feobank é um projeto de internet banking para o trabalho de laborátorio de redes.";
+            let message = "Feobank is an internet banking project for the faculty work of the discipline of laboratory of networks and operating systems.";
             ui.add_layer(Dialog::info(message));
         })
     }
@@ -85,7 +85,8 @@ impl App {
     fn try_connect_server(ui: &mut Cursive, addr: &str) {
         if addr.is_empty() {
             ui.add_layer(Dialog::info("Please enter the feobank's server address!"));
-        } else {
+        }
+        else {
             let content = format!("Connecting to {}...", addr);
             ui.pop_layer();
             ui.add_layer(
@@ -302,6 +303,7 @@ impl App {
             .padding_lrtb(1, 1, 1, 0)
             .content(
                 SelectView::new()
+                .item("Update balance", 0)
                 .item("Pay Bill", 1)
                 .item("Transfer Money", 2)
                 .item("Get Statment", 3)
@@ -309,11 +311,12 @@ impl App {
                 .item("Log out", 5)
                 .on_submit(|ui, item| {
                     match item {
+                        0 => App::update_info_main_menu(ui),
                         1 => App::action_pay_bill_dialog(ui),
                         2 => App::action_transfer_money_dialog(ui),
                         3 => App::action_get_statment_dialog(ui),
                         4 => App::action_create_bill_dialog(ui),
-                        5 => App::action_log_out(ui),
+                        5 => App::action_logout(ui),
                         _ => unreachable!("no such item"),
                     };
                 })
@@ -363,7 +366,7 @@ impl App {
             .padding_lrtb(1, 1, 1, 0)
             .content(
                 LinearLayout::vertical()
-                .child(TextView::new(format!("Value: {}", bill.value)))
+                .child(TextView::new(format!("Value: ${}", bill.value)))
                 .child(TextView::new(format!("Favored: {}", bill.favored_name)))
                 .child(TextView::new(format!("Bill Code: {}", bill.id)))
             )
@@ -371,7 +374,13 @@ impl App {
             .button("Pay", move |ui| {
                 let session = ui.user_data::<Session>().unwrap();
                 match session.pay_bill(bill.id) {
-                    Ok(()) => {},
+                    Ok(()) => {
+                        App::update_info_main_menu(ui);
+                        ui.add_layer(
+                            Dialog::around(TextView::new("The bill was paid successfully!"))
+                                .button("Ok", |ui| {ui.pop_layer();ui.pop_layer();}),
+                        );
+                    },
                     Err(msg) => {
                         ui.add_layer(
                             Dialog::around(TextView::new(msg))
@@ -443,17 +452,86 @@ impl App {
     }
 
     fn action_get_statment_dialog(ui: &mut Cursive) {
-
+        let session = ui.user_data::<Session>().unwrap();
+        match session.get_statment() {
+            Ok(statment) => {
+                ui.add_layer(
+                Dialog::new()
+                   .title("Statment")
+                   .padding_lrtb(1, 1, 1, 0)
+                   .content(TextView::new(statment))
+                   .button("Back", |ui| {ui.pop_layer();})
+                )
+            },
+            Err(msg) => {
+                ui.add_layer(
+                    Dialog::around(TextView::new(msg))
+                        .button("Ok", |ui| {ui.pop_layer();}),
+                );
+            }
+        }
     }
 
     fn action_create_bill_dialog(ui: &mut Cursive) {
-
+        ui.add_layer(
+            Dialog::new()
+            .title("Create Bill")
+            .padding_lrtb(1, 1, 1, 0)
+            .content(
+                LinearLayout::vertical()
+                .child(TextView::new("Value:"))
+                .child(
+                EditView::new()
+                    .max_content_width(14)
+                    .on_edit_mut(|ui, c, _|{
+                        if let Err(_) = c.parse::<f32>() {
+                            ui.call_on_name("value", |v: &mut EditView|{
+                                let mut c = v.get_content().to_string();
+                                c.pop();
+                                v.set_content(&c);
+                            });
+                        }
+                    })
+                    .with_name("value")
+                    .fixed_width(15)
+                )
+            )
+            .button("Cancel", |ui| {ui.pop_layer();})
+            .button("Next", |ui| {
+                let value = ui.call_on_name("value", |v: &mut EditView| v.get_content())
+                    .unwrap();
+                let value = value.parse::<f32>().unwrap();
+                let session = ui.user_data::<Session>().unwrap();
+                match session.create_bill(value) {
+                    Ok(bill_id) => {
+                        ui.add_layer(
+                            Dialog::around(
+                                TextView::new(
+                                    format!(
+                                        "Bill successfully created,\n{}{}\n{}",
+                                        "Bill Code: ", bill_id,
+                                        "Share the code with the other bank user, so that he can make the payment."
+                                    )
+                                ))
+                                .button("Ok", |ui| {ui.pop_layer();ui.pop_layer();}),
+                        );
+                    },
+                    Err(msg) => {
+                        ui.add_layer(
+                            Dialog::around(TextView::new(msg))
+                                .button("Ok", |ui| {ui.pop_layer();}),
+                        );
+                    }
+                };
+            })
+        )
     }
 
-    fn action_log_out(ui: &mut Cursive) {
+    fn action_logout(ui: &mut Cursive) {
         let session = ui.user_data::<Session>().unwrap();
         session.logout();
         ui.pop_layer();
+        App::login_dialog(ui);
     }
 
 }

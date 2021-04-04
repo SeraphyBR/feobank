@@ -37,7 +37,7 @@ pub enum UserAction {
     TransferMoney {dest_cpf: String, value: f32},
     GetBillInfo(Uuid),
     PayBill(Uuid),
-    CreateBill {},
+    CreateBill(f32),
     GetStatment,
     GetBasicInfo
 }

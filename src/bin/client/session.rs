@@ -69,7 +69,27 @@ impl Session {
     }
 
     pub fn pay_bill(&mut self, bill_id: Uuid) -> Result<(), String> {
-        todo!()
+        let action = UserAction::PayBill(bill_id);
+        let data = serde_json::to_string(&action).unwrap();
+        self.write_message(data);
+        let response = self.read_message();
+        serde_json::from_str(&response).unwrap()
+    }
+
+    pub fn get_statment(&mut self) -> Result<String, String> {
+        let action = UserAction::GetStatment;
+        let data = serde_json::to_string(&action).unwrap();
+        self.write_message(data);
+        let response = self.read_message();
+        serde_json::from_str(&response).unwrap()
+    }
+
+    pub fn create_bill(&mut self, value: f32) -> Result<Uuid, String> {
+        let action = UserAction::CreateBill(value);
+        let data = serde_json::to_string(&action).unwrap();
+        self.write_message(data);
+        let response = self.read_message();
+        serde_json::from_str(&response).unwrap()
     }
 
     pub fn transfer_money(&mut self, dest_cpf: String, value: f32) -> Result<(), String> {
