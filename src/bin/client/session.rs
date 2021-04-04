@@ -1,7 +1,7 @@
-use rust_decimal::Decimal;
+use uuid::Uuid;
 use std::{error::Error, io::{Read, Write}, net::{Ipv4Addr, Shutdown, SocketAddr, TcpStream}};
 
-use feobank::user::*;
+use feobank::{bill::Bill, user::*};
 use feobank::user::UserAction::*;
 
 pub struct Session {
@@ -46,6 +46,34 @@ impl Session {
 
     pub fn create_user(&mut self, user: NewUser) -> Result<(), String> {
         let action = UserAction::CreateUser(user);
+        let data = serde_json::to_string(&action).unwrap();
+        self.write_message(data);
+        let response = self.read_message();
+        serde_json::from_str(&response).unwrap()
+    }
+
+    pub fn get_bill_info(&mut self, bill_id: Uuid) -> Result<Bill, String> {
+        let action = UserAction::GetBillInfo(bill_id);
+        let data = serde_json::to_string(&action).unwrap();
+        self.write_message(data);
+        let response = self.read_message();
+        serde_json::from_str(&response).unwrap()
+    }
+
+    pub fn pay_bill(&mut self, bill_id: Uuid) -> Result<(), String> {
+        todo!()
+    }
+
+    pub fn transfer_money(&mut self, dest_cpf: String, value: f32) -> Result<(), String> {
+        let action = UserAction::TransferMoney {dest_cpf, value};
+        let data = serde_json::to_string(&action).unwrap();
+        self.write_message(data);
+        let response = self.read_message();
+        serde_json::from_str(&response).unwrap()
+    }
+
+    pub fn get_basic_info(&mut self) -> Option<(String, f32)> {
+        let action = UserAction::GetBasicInfo;
         let data = serde_json::to_string(&action).unwrap();
         self.write_message(data);
         let response = self.read_message();

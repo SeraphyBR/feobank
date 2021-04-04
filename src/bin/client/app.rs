@@ -1,11 +1,11 @@
-use chrono::{NaiveDate, Utc};
+use chrono::{NaiveDate, NaiveDateTime, Utc};
 use cursive::{Cursive, CursiveRunnable, event::{Callback, Key}, menu, traits::*, views::{Button, Dialog, EditView, LinearLayout, SelectView, TextView}};
 use cursive_calendar_view::{CalendarView, EnglishLocale};
-use feobank::user::{NewUser, User, UserAction};
+use feobank::{bill::Bill, user::{NewUser, User, UserAction}};
+use uuid::Uuid;
 use crate::session::Session;
 use cursive::menu::MenuTree;
 use std::{collections::HashMap, net::TcpStream, str::FromStr};
-
 
 pub struct App {
     ui: CursiveRunnable
@@ -31,7 +31,6 @@ impl App {
     }
 
     fn create_menubar(&mut self) {
-        // The menubar is a list of (label, menu tree) pairs.
         self.ui.menubar()
             .add_subtree("Help",App::help_menu())
             .add_delimiter()
@@ -59,24 +58,18 @@ impl App {
         self.ui.add_layer(
             Dialog::new()
                 .title("Enter server ip address and port:")
-                // Padding is (left, right, top, bottom)
                 .padding_lrtb(1, 1, 1, 0)
                 .content(
                     EditView::new()
                         .max_content_width(24)
                         .content("127.0.0.1:7364")
-                        // Call `show_popup` when the user presses `Enter`
                         .on_submit(App::try_connect_server)
-                        // Give the `EditView` a name so we can refer to it later.
                         .with_name("connection_dialog")
                         .fixed_width(25)
                 )
                 .button("Ok", |ui| {
-                    // This will run the given closure, *ONLY* if a view with the
-                    // correct type and the given name is found.
                     let addr = ui
                         .call_on_name("connection_dialog", |view: &mut EditView| {
-                            // We can return content from the closure!
                             view.get_content()
                         })
                         .unwrap();
@@ -91,20 +84,16 @@ impl App {
     // If the name is empty, we'll show an error message instead.
     fn try_connect_server(ui: &mut Cursive, addr: &str) {
         if addr.is_empty() {
-            // Try again as many times as we need!
             ui.add_layer(Dialog::info("Please enter the feobank's server address!"));
         } else {
             let content = format!("Connecting to {}...", addr);
-            // Remove the initial popup
             ui.pop_layer();
-            // And put a new one instead
             ui.add_layer(
                 Dialog::around(TextView::new(content))
                     .button("Ok", |ui| {ui.pop_layer();}),
             );
 
             if let Ok(s) = TcpStream::connect(addr) {
-                // Remove the initial popup
                 ui.pop_layer();
 
                 //let session = Rc::new(RefCell::new(Session::new(s)));
@@ -118,7 +107,6 @@ impl App {
         ui.add_layer(
             Dialog::new()
                 .title("Login")
-                // Padding is (left, right, top, bottom)
                 .padding_lrtb(1, 1, 1, 0)
                 .content(
                     LinearLayout::vertical()
@@ -127,7 +115,6 @@ impl App {
                         EditView::new()
                             .max_content_width(11)
                             .content("02352154650")
-                            // Give the `EditView` a name so we can refer to it later.
                             .with_name("login_cpf")
                         )
                         .child(TextView::new("Password:"))
@@ -136,7 +123,6 @@ impl App {
                             .max_content_width(16)
                             .content("Senha")
                             .secret()
-                            // Give the `EditView` a name so we can refer to it later.
                             .with_name("login_password")
                         )
                 )
@@ -148,14 +134,12 @@ impl App {
                     // correct type and the given name is found.
                     let cpf = ui
                         .call_on_name("login_cpf", |view: &mut EditView| {
-                            // We can return content from the closure!
                             view.get_content()
                         })
                         .unwrap()
                         .to_string();
                     let password = ui
                         .call_on_name("login_password", |view: &mut EditView| {
-                            // We can return content from the closure!
                             view.get_content()
                         })
                         .unwrap()
@@ -168,6 +152,7 @@ impl App {
                             ui.pop_layer();
                             // And put a new one instead
                             App::action_menu_dialog(ui);
+                            App::update_info_main_menu(ui);
                         }
                         Err(msg) => {
                             let content = format!("Error: {}", msg);
@@ -185,7 +170,6 @@ impl App {
         ui.add_layer(
             Dialog::new()
                 .title("Create Account")
-                // Padding is (left, right, top, bottom)
                 .padding_lrtb(1, 1, 1, 0)
                 .content(
                     LinearLayout::vertical()
@@ -193,14 +177,12 @@ impl App {
                         .child(
                         EditView::new()
                             .max_content_width(120)
-                            // Give the `EditView` a name so we can refer to it later.
                             .with_name("name")
                         )
                         .child(TextView::new("Email:"))
                         .child(
                         EditView::new()
                             .max_content_width(40)
-                            // Give the `EditView` a name so we can refer to it later.
                             .with_name("email")
                         )
                         .child(TextView::new("Birthdate: "))
@@ -234,28 +216,24 @@ impl App {
                         .child(
                         EditView::new()
                             .max_content_width(16)
-                            // Give the `EditView` a name so we can refer to it later.
                             .with_name("phone")
                         )
                         .child(TextView::new("Address:"))
                         .child(
                         EditView::new()
                             .max_content_width(16)
-                            // Give the `EditView` a name so we can refer to it later.
                             .with_name("address")
                         )
                         .child(TextView::new("CPF:"))
                         .child(
                         EditView::new()
                             .max_content_width(16)
-                            // Give the `EditView` a name so we can refer to it later.
                             .with_name("cpf")
                         )
                         .child(TextView::new("Password:"))
                         .child(
                         EditView::new()
                             .max_content_width(16)
-                            // Give the `EditView` a name so we can refer to it later.
                             .with_name("password")
                         )
                 )
@@ -271,7 +249,7 @@ impl App {
                         values.insert(*name, value);
                     }
 
-                    let birthdate = NaiveDate::from_str(&values["birthdate"]).unwrap();
+                    let birthdate = NaiveDate::from_str(&values["birthdate"]).unwrap().and_hms(1, 0, 0);
                     let user = NewUser {
                         name: values["name"].to_string(),
                         email: values["email"].to_string(),
@@ -304,6 +282,18 @@ impl App {
         );
     }
 
+    fn update_info_main_menu(ui: &mut Cursive) {
+        let session = ui.user_data::<Session>().unwrap();
+        match session.get_basic_info() {
+            Some(i) => {
+                ui.call_on_name("main_menu", |v: &mut Dialog|{
+                    v.set_title(format!("Main Menu - User: {} - Balance: ${}", i.0, i.1))
+                });
+            }
+            None => ()
+        };
+    }
+
     fn action_menu_dialog(ui: &mut Cursive) {
         ui.add_layer(
         Dialog::new()
@@ -326,6 +316,7 @@ impl App {
                     };
                 })
             )
+            .with_name("main_menu")
         )
     }
 
@@ -336,19 +327,116 @@ impl App {
             .padding_lrtb(1, 1, 1, 0)
             .content(
                 LinearLayout::vertical()
-                .child(TextView::new("Id:"))
+                .child(TextView::new("Bill Code:"))
                 .child(
                 EditView::new()
-                    .max_content_width(16)
-                    // Give the `EditView` a name so we can refer to it later.
+                    .max_content_width(36)
                     .with_name("bill_id")
+                    .fixed_width(37)
                 )
             )
+            .button("Cancel", |ui| {ui.pop_layer();})
+            .button("Next", |ui| {
+                let bill_id = ui.call_on_name("bill_id", |v: &mut EditView| v.get_content())
+                    .unwrap();
+                let bill_id = Uuid::parse_str(&bill_id).unwrap();
+                let session = ui.user_data::<Session>().unwrap();
+                match session.get_bill_info(bill_id) {
+                    Ok(bill) => App::display_bill_info_dialog(ui, bill),
+                    Err(msg) => {
+                        ui.add_layer(
+                            Dialog::around(TextView::new(msg))
+                                .button("Ok", |ui| {ui.pop_layer();}),
+                        );
+                    }
+                };
+            })
+        )
+    }
+
+    fn display_bill_info_dialog(ui: &mut Cursive, bill: Bill) {
+        ui.add_layer(
+            Dialog::new()
+            .title("Bill Info")
+            .padding_lrtb(1, 1, 1, 0)
+            .content(
+                LinearLayout::vertical()
+                .child(TextView::new(format!("Value: {}", bill.value)))
+                .child(TextView::new(format!("Favored: {}", bill.favored_name)))
+                .child(TextView::new(format!("Bill Code: {}", bill.id)))
+            )
+            .button("Cancel", |ui| {ui.pop_layer();})
+            .button("Pay", move |ui| {
+                let session = ui.user_data::<Session>().unwrap();
+                match session.pay_bill(bill.id) {
+                    Ok(()) => {},
+                    Err(msg) => {
+                        ui.add_layer(
+                            Dialog::around(TextView::new(msg))
+                                .button("Ok", |ui| {ui.pop_layer();}),
+                        );
+                    }
+                };
+            })
         )
     }
 
     fn action_transfer_money_dialog(ui: &mut Cursive) {
-
+        ui.add_layer(
+            Dialog::new()
+            .title("Transfer Money")
+            .padding_lrtb(1, 1, 1, 0)
+            .content(
+                LinearLayout::vertical()
+                .child(TextView::new("CPF:"))
+                .child(
+                EditView::new()
+                    .max_content_width(14)
+                    .with_name("cpf")
+                    .fixed_width(15)
+                )
+                .child(TextView::new("Value:"))
+                .child(
+                EditView::new()
+                    .max_content_width(14)
+                    .on_edit_mut(|ui, c, _|{
+                        if let Err(_) = c.parse::<f32>() {
+                            ui.call_on_name("value", |v: &mut EditView|{
+                                let mut c = v.get_content().to_string();
+                                c.pop();
+                                v.set_content(&c);
+                            });
+                        }
+                    })
+                    .with_name("value")
+                    .fixed_width(15)
+                )
+            )
+            .button("Cancel", |ui| {ui.pop_layer();})
+            .button("Next", |ui| {
+                let cpf = ui.call_on_name("cpf", |v: &mut EditView| v.get_content())
+                    .unwrap().to_string();
+                //todo Validate CPF
+                let value = ui.call_on_name("value", |v: &mut EditView| v.get_content())
+                    .unwrap();
+                let value = value.parse::<f32>().unwrap();
+                let session = ui.user_data::<Session>().unwrap();
+                match session.transfer_money(cpf, value) {
+                    Ok(()) => {
+                        ui.add_layer(
+                            Dialog::around(TextView::new("Successfully transferred!"))
+                                .button("Ok", |ui| {ui.pop_layer();}),
+                        );
+                    },
+                    Err(msg) => {
+                        ui.add_layer(
+                            Dialog::around(TextView::new(msg))
+                                .button("Ok", |ui| {ui.pop_layer();}),
+                        );
+                    }
+                };
+            })
+        )
     }
 
     fn action_get_statment_dialog(ui: &mut Cursive) {
@@ -359,7 +447,4 @@ impl App {
 
     }
 
-    fn main_menubar(ui: &mut Cursive) {
-        todo!()
-    }
 }

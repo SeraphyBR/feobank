@@ -1,6 +1,5 @@
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
-use rust_decimal::Decimal;
 use uuid::Uuid;
 
 #[derive(Serialize, Deserialize)]
@@ -13,7 +12,7 @@ pub struct User {
     pub name: String,
     pub address: String,
     pub phone: String,
-    pub birthdate: NaiveDate,
+    pub birthdate: NaiveDateTime,
     pub last_login: Option<NaiveDateTime>,
 }
 
@@ -25,7 +24,7 @@ pub struct NewUser {
     pub password: String,
     pub address: String,
     pub phone: String,
-    pub birthdate: NaiveDate
+    pub birthdate: NaiveDateTime
 }
 
 #[derive(Serialize, Deserialize)]
@@ -33,8 +32,10 @@ pub enum UserAction {
     Login {cpf: String, password: String},
     CreateUser(NewUser),
     DeleteUser,
-    TransferMoney {dest_cpf: String, value: Decimal},
+    TransferMoney {dest_cpf: String, value: f32},
+    GetBillInfo(Uuid),
     PayBill(Uuid),
     CreateBill {},
-    GetStatment
+    GetStatment,
+    GetBasicInfo
 }

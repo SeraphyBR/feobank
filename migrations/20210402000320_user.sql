@@ -8,7 +8,7 @@ CREATE TABLE user (
   name TEXT NOT NULL,
   address TEXT NOT NULL,
   phone TEXT NOT NULL,
-  birthdate TIMESTAMP NOT NULL,
-  last_login TIMESTAMP,
+  birthdate DATETIME NOT NULL,
+  last_login DATETIME,
   FOREIGN KEY(account_id) REFERENCES account(id)
 );

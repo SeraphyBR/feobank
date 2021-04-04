@@ -1,12 +1,11 @@
-use chrono::NaiveDate;
+use chrono::{NaiveDate, NaiveDateTime};
 use serde::{Deserialize, Serialize};
-use rust_decimal::Decimal;
 use uuid::Uuid;
 
 #[derive(Serialize, Deserialize)]
 pub struct Account {
-    id: Uuid,
-    agency: u8,
-    balance: Decimal,
-    created_date: NaiveDate,
+    pub id: Uuid,
+    pub agency: u8,
+    pub balance: f32,
+    pub created_date: NaiveDateTime,
 }

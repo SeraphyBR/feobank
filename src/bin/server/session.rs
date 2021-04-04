@@ -1,15 +1,14 @@
 use chrono::NaiveDate;
-use rust_decimal::Decimal;
 use sqlx::SqlitePool;
 use tokio::{io::{self, AsyncReadExt, AsyncWriteExt}, net::TcpStream};
-use feobank::user::*;
+use feobank::{account::Account, bill::Bill, user::*};
 use feobank::user::UserAction::*;
 use uuid::Uuid;
 
 use bcrypt::{DEFAULT_COST, hash, verify};
 
 pub struct Session {
-    user: Option<User>,
+    user: Option<(User, Account)>,
     conn: TcpStream,
     db: SqlitePool
 }
@@ -56,11 +55,13 @@ impl Session {
         match action {
             Login { cpf, password } => self.login(cpf, password).await?,
             CreateUser(data) => self.create_user(data).await?,
-            DeleteAccount => self.delete_user().await,
-            TransferMoney { dest_cpf, value } => self.transfer_money(dest_cpf, value).await,
+            DeleteUser => self.delete_user().await,
+            TransferMoney { dest_cpf, value } => self.transfer_money(dest_cpf, value).await?,
+            GetBillInfo(bill_id) => self.get_bill_info(bill_id).await?,
             PayBill(_) => {}
             CreateBill {  } => {}
             GetStatment => {}
+            GetBasicInfo => self.get_basic_info().await?
         }
         Ok(())
     }
@@ -73,24 +74,37 @@ impl Session {
 
         let response: Result<(), &str>;
         if valid {
-            response = Ok(());
             let record = sqlx::query!("SELECT * FROM user WHERE cpf = ?", cpf)
                 .fetch_one(&self.db).await.unwrap();
 
-            self.user = Some(
-                User {
-                    id: Uuid::parse_str(&record.id).unwrap(),
-                    account_id: Uuid::parse_str(&record.account_id).unwrap(),
-                    cpf: record.cpf,
-                    password: record.password,
-                    email: record.email,
-                    name: record.name,
-                    address: record.address,
-                    phone: record.phone,
-                    birthdate: record.birthdate.date(),
-                    last_login: record.last_login
-                }
-            );
+            let user = User {
+                id: Uuid::parse_str(&record.id).unwrap(),
+                account_id: Uuid::parse_str(&record.account_id).unwrap(),
+                cpf: record.cpf,
+                password: record.password,
+                email: record.email,
+                name: record.name,
+                address: record.address,
+                phone: record.phone,
+                birthdate: record.birthdate,
+                last_login: record.last_login
+            };
+
+            println!("Teste ID: {}", user.account_id);
+            let account_id = user.account_id.to_hyphenated();
+
+            let record = sqlx::query!("SELECT * FROM account WHERE id = ?", account_id)
+                .fetch_one(&self.db).await.unwrap();
+
+            let account = Account {
+                id: Uuid::parse_str(&record.id).unwrap(),
+                agency: record.agency as u8,
+                balance: record.balance,
+                created_date: record.created_date
+            };
+
+            self.user = Some((user, account));
+            response = Ok(());
         }
         else {
             response = Err("CPF/Password is not valid");
@@ -110,13 +124,11 @@ impl Session {
         let _result = sqlx::query!(
             "INSERT INTO account (
                 id,
-                agency
-            ) VALUES (?, ?)",
-            id_account,
-            1
+                agency,
+                balance
+            ) VALUES (?, ?, ?)",
+            id_account, 1, 100
         ).execute(&self.db).await.unwrap();
-
-        let birthdate = u.birthdate.and_hms(1, 0, 0);
 
         let _result = sqlx::query!(
             "INSERT INTO user (
@@ -138,7 +150,7 @@ impl Session {
             u.name,
             u.address,
             u.phone,
-            birthdate
+            u.birthdate
         )
         .execute(&self.db).await.unwrap();
 
@@ -148,11 +160,102 @@ impl Session {
         Ok(())
     }
 
+    async fn get_bill_info(&mut self, bill_id: Uuid) -> io::Result<()> {
+        let bill_id = bill_id.to_string();
+        let result = sqlx::query!("SELECT * FROM bill WHERE id = ?", bill_id)
+            .fetch_one(&self.db).await;
+
+        let response = match result {
+            Ok(b) => Ok(Bill {
+                id: Uuid::parse_str(&b.id).unwrap(),
+                account_id: Uuid::parse_str(&b.account_id).unwrap(),
+                favored_name: b.favored_name,
+                value: b.value,
+                created_date: b.created_date
+            }),
+            Err(_) => {
+                Err("The bill does not exist, or has already been paid!")
+            }
+        };
+
+        let message = serde_json::to_string(&response).unwrap();
+        self.write_message(message).await?;
+        Ok(())
+    }
+
     async fn delete_user(&mut self) {
 
     }
 
-    async fn transfer_money(&mut self, dest_cpf: String, value: Decimal) {
+    async fn transfer_money(&mut self, dest_cpf: String, value: f32) -> io::Result<()> {
+        if let Some((_, account)) = &mut self.user {
+            let response: Result<(), &str>;
 
+            if account.balance - value >= 0f32 {
+                let remain = account.balance - value;
+
+                let record = sqlx::query!("SELECT account_id FROM user WHERE cpf = ?", dest_cpf)
+                    .fetch_one(&self.db).await;
+
+                let record = match record {
+                    Ok(r) => r,
+                    Err(_) => {
+                        response = Err("User not found!");
+                        let message= serde_json::to_string(&response).unwrap();
+                        self.write_message(message).await?;
+                        return Ok(());
+                    }
+                };
+
+                let account_dist = record.account_id;
+
+                let record = sqlx::query!("SELECT balance FROM account WHERE id = ?", account_dist)
+                    .fetch_one(&self.db).await.unwrap();
+
+                let new_balance_dist = record.balance + value;
+
+                let id_transaction = Uuid::new_v4().to_string();
+
+                sqlx::query!("INSERT INTO transactions(id,account_src,account_dist,value) VALUES (?, ?, ?, ?)",
+                    id_transaction,
+                    account.id,
+                    account_dist,
+                    value
+                ).execute(&self.db).await.unwrap();
+
+                sqlx::query!("INSERT INTO account_transaction(account_id,transaction_id) VALUES (?, ?)",
+                    account.id,
+                    id_transaction
+                ).execute(&self.db).await.unwrap();
+
+                sqlx::query!("UPDATE account SET balance = ? WHERE id = ?", new_balance_dist, account_dist)
+                    .execute(&self.db)
+                    .await
+                    .unwrap();
+
+                sqlx::query!("UPDATE account SET balance = ? WHERE id = ?", remain, account.id)
+                    .execute(&self.db)
+                    .await
+                    .unwrap();
+
+                account.balance = remain;
+
+                response = Ok(());
+                let message= serde_json::to_string(&response).unwrap();
+                self.write_message(message).await?;
+            }
+        }
+        Ok(())
+    }
+
+    async fn get_basic_info(&mut self) -> io::Result<()> {
+        let value: Option<(&str, f32)>;
+        if let Some((u, a)) = &self.user {
+            value = Some((&u.name, a.balance));
+        } else {
+            value = None;
+        }
+        let message = serde_json::to_string(&value).unwrap();
+        self.write_message(message).await
     }
 }

@@ -11,12 +11,11 @@ chrono = { version = "0.4.19", features = ["serde"] }
 dotenv = "0.15.0"
 serde = { version = "1.0.117", features = ["derive"] }
 serde_json = "1.0"
-sqlx = { version = "0.5", features = [ "runtime-tokio-rustls", "sqlite", "macros", "chrono" ] }
+sqlx = { version = "0.5.1", features = [ "runtime-tokio-rustls", "sqlite", "macros", "chrono", "uuid" ] }
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.2", features = ["fmt"] }
-uuid = { version = "0.8", features = ["serde", "v4"] }
-rust_decimal = "1.10.3"
+uuid = { version = "0.8.2", features = ["serde", "v4", "std"] }
 bcrypt = "0.9"
 cursive = { version = "0.16", features = ["crossterm-backend"]}
 cursive_calendar_view = "0.7"
