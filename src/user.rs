@@ -30,6 +30,8 @@ pub struct NewUser {
 #[derive(Serialize, Deserialize)]
 pub enum UserAction {
     Login {cpf: String, password: String},
+    Logout,
+    CloseServerConnection,
     CreateUser(NewUser),
     DeleteUser,
     TransferMoney {dest_cpf: String, value: f32},

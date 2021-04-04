@@ -19,3 +19,4 @@ uuid = { version = "0.8.2", features = ["serde", "v4", "std"] }
 bcrypt = "0.9"
 cursive = { version = "0.16", features = ["crossterm-backend"]}
 cursive_calendar_view = "0.7"
+human-panic = "1.0.3"

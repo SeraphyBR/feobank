@@ -2,7 +2,6 @@ use uuid::Uuid;
 use std::{error::Error, io::{Read, Write}, net::{Ipv4Addr, Shutdown, SocketAddr, TcpStream}};
 
 use feobank::{bill::Bill, user::*};
-use feobank::user::UserAction::*;
 
 pub struct Session {
     conn: TcpStream
@@ -15,7 +14,10 @@ impl Session {
         }
     }
 
-    pub fn close(&self) {
+    pub fn close(&mut self) {
+        let action = UserAction::CloseServerConnection;
+        let data = serde_json::to_string(&action).unwrap();
+        self.write_message(data);
         self.conn.shutdown(Shutdown::Both).unwrap();
     }
 
@@ -42,6 +44,12 @@ impl Session {
 
         let response = self.read_message();
         serde_json::from_str(&response).unwrap()
+    }
+
+    pub fn logout(&mut self) {
+        let action = UserAction::Logout;
+        let data = serde_json::to_string(&action).unwrap();
+        self.write_message(data);
     }
 
     pub fn create_user(&mut self, user: NewUser) -> Result<(), String> {

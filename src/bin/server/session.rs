@@ -45,7 +45,12 @@ impl Session {
         loop {
             let action = self.read_message().await?;
             match serde_json::from_str::<UserAction>(&action) {
-                Ok(action) => self.take_action(action).await?,
+                Ok(action) => {
+                    match action {
+                        CloseServerConnection => break Ok(()),
+                        _ => self.take_action(action).await?
+                    }
+                },
                 Err(e) => {}
             };
         }
@@ -54,6 +59,7 @@ impl Session {
     async fn take_action(&mut self, action: UserAction) -> io::Result<()> {
         match action {
             Login { cpf, password } => self.login(cpf, password).await?,
+            Logout => self.logout().await,
             CreateUser(data) => self.create_user(data).await?,
             DeleteUser => self.delete_user().await,
             TransferMoney { dest_cpf, value } => self.transfer_money(dest_cpf, value).await?,
@@ -61,7 +67,8 @@ impl Session {
             PayBill(_) => {}
             CreateBill {  } => {}
             GetStatment => {}
-            GetBasicInfo => self.get_basic_info().await?
+            GetBasicInfo => self.get_basic_info().await?,
+            _ => {}
         }
         Ok(())
     }
@@ -90,7 +97,6 @@ impl Session {
                 last_login: record.last_login
             };
 
-            println!("Teste ID: {}", user.account_id);
             let account_id = user.account_id.to_hyphenated();
 
             let record = sqlx::query!("SELECT * FROM account WHERE id = ?", account_id)
@@ -215,16 +221,17 @@ impl Session {
                 let new_balance_dist = record.balance + value;
 
                 let id_transaction = Uuid::new_v4().to_string();
+                let account_id = account.id.to_hyphenated();
 
                 sqlx::query!("INSERT INTO transactions(id,account_src,account_dist,value) VALUES (?, ?, ?, ?)",
                     id_transaction,
-                    account.id,
+                    account_id,
                     account_dist,
                     value
                 ).execute(&self.db).await.unwrap();
 
                 sqlx::query!("INSERT INTO account_transaction(account_id,transaction_id) VALUES (?, ?)",
-                    account.id,
+                    account_id,
                     id_transaction
                 ).execute(&self.db).await.unwrap();
 
@@ -233,7 +240,7 @@ impl Session {
                     .await
                     .unwrap();
 
-                sqlx::query!("UPDATE account SET balance = ? WHERE id = ?", remain, account.id)
+                sqlx::query!("UPDATE account SET balance = ? WHERE id = ?", remain, account_id)
                     .execute(&self.db)
                     .await
                     .unwrap();
@@ -257,5 +264,15 @@ impl Session {
         }
         let message = serde_json::to_string(&value).unwrap();
         self.write_message(message).await
+    }
+
+    async fn logout(&mut self) {
+        if self.user.is_some() {
+            self.user = None;
+        }
+    }
+
+    async fn close_connection(&mut self) {
+
     }
 }

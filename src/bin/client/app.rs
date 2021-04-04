@@ -36,7 +36,7 @@ impl App {
             .add_delimiter()
             .add_leaf("Quit", |ui| {
                     match ui.take_user_data::<Session>() {
-                        Some(s) => {
+                        Some(mut s) => {
                            s.close();
                         },
                         None => {}
@@ -306,12 +306,14 @@ impl App {
                 .item("Transfer Money", 2)
                 .item("Get Statment", 3)
                 .item("Create Bill", 4)
+                .item("Log out", 5)
                 .on_submit(|ui, item| {
                     match item {
                         1 => App::action_pay_bill_dialog(ui),
                         2 => App::action_transfer_money_dialog(ui),
                         3 => App::action_get_statment_dialog(ui),
                         4 => App::action_create_bill_dialog(ui),
+                        5 => App::action_log_out(ui),
                         _ => unreachable!("no such item"),
                     };
                 })
@@ -423,6 +425,7 @@ impl App {
                 let session = ui.user_data::<Session>().unwrap();
                 match session.transfer_money(cpf, value) {
                     Ok(()) => {
+                        App::update_info_main_menu(ui);
                         ui.add_layer(
                             Dialog::around(TextView::new("Successfully transferred!"))
                                 .button("Ok", |ui| {ui.pop_layer();}),
@@ -445,6 +448,12 @@ impl App {
 
     fn action_create_bill_dialog(ui: &mut Cursive) {
 
+    }
+
+    fn action_log_out(ui: &mut Cursive) {
+        let session = ui.user_data::<Session>().unwrap();
+        session.logout();
+        ui.pop_layer();
     }
 
 }

@@ -52,6 +52,7 @@ async fn main() {
                     info!("The connection to {:?} was terminated unexpectedly", addr)
                 }
             });
+            info!("The session with {:?} ended", addr);
         });
     }
 }
