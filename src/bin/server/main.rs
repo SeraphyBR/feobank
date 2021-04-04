@@ -45,13 +45,16 @@ async fn main() {
 
         let db = pool.clone();
 
+        // One Tokio Task By Connection/Session
         tokio::spawn(async move {
             let mut session = Session::new(socket, db);
-            session.start().await.unwrap_or_else(|e| {
-                if e.kind() == ErrorKind::UnexpectedEof {
-                    info!("The connection to {:?} was terminated unexpectedly", addr)
-                }
-            });
+            session.start()
+                .await
+                .unwrap_or_else(|e| {
+                    if e.kind() == ErrorKind::UnexpectedEof {
+                        info!("The connection to {:?} was terminated unexpectedly", addr)
+                    }
+                });
             info!("The session with {:?} ended", addr);
         });
     }
