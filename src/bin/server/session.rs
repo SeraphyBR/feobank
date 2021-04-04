@@ -75,6 +75,10 @@ impl Session {
         Ok(())
     }
 
+    async fn delete_user(&mut self) {
+
+    }
+
     async fn login(&mut self, cpf: String, password: String) -> io::Result<()> {
         let record = sqlx::query!("SELECT password FROM user WHERE cpf = ?", cpf)
             .fetch_one(&self.db).await.unwrap();
@@ -223,11 +227,8 @@ impl Session {
         Ok(())
     }
 
-    async fn delete_user(&mut self) {
-
-    }
-
     async fn transfer_money(&mut self, dest_cpf: String, value: f32, account_id: Option<Uuid>) -> io::Result<()> {
+        self.update_balance().await;
         if let Some((_, account)) = &mut self.user {
             let response: Result<(), &str>;
 
@@ -330,13 +331,27 @@ impl Session {
 
     async fn get_basic_info(&mut self) -> io::Result<()> {
         let value: Option<(&str, f32)>;
-        if let Some((u, a)) = &self.user {
+        if let Some((u, a)) = &mut self.user {
+            let account_id = a.id.to_hyphenated();
+            let record = sqlx::query!("SELECT balance FROM account WHERE id = ?", account_id)
+                .fetch_one(&self.db).await.unwrap();
+
+            a.balance = record.balance;
             value = Some((&u.name, a.balance));
         } else {
             value = None;
         }
         let message = serde_json::to_string(&value).unwrap();
         self.write_message(message).await
+    }
+
+    async fn update_balance(&mut self) {
+        if let Some((_u, a)) = &mut self.user {
+            let account_id = a.id.to_hyphenated();
+            let record = sqlx::query!("SELECT balance FROM account WHERE id = ?", account_id)
+                .fetch_one(&self.db).await.unwrap();
+            a.balance = record.balance;
+        }
     }
 
     async fn gen_statment(&mut self) -> io::Result<()> {
