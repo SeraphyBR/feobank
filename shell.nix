@@ -8,6 +8,13 @@
         rustc
         cargo
         cargo-edit
+
+        # Use steam-run, for a fhs enviroment, allow vscode code-lldb debugger to run
+        # $ steam-run code .
+        (steam.override {
+          extraPkgs = pkgs: [ ncurses zlib ];
+          nativeOnly = true;
+        }).run
     ];
     shellHook = ''
     if [ ! -e "feobank.db" ]; then
